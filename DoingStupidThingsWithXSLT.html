@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="security" content="public"/>
+<meta name="Robots" content="index,follow"/>
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta name="DC.Type" content="concept"/>
+<meta name="DC.Title" content="Doing stupid things with XSLT"/>
+<meta name="abstract" content="Author: Deborah Pickett &lt;debbiep-osdc@futzle.com&gt;"/>
+<meta name="description" content="Author: Deborah Pickett &lt;debbiep-osdc@futzle.com&gt;"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="fixme"/>
+<link rel="stylesheet" type="text/css" href="commonltr.css"/>
+<title>Doing stupid things with XSLT</title>
+</head>
+<body>
+
+
+    <div class="nested0" id="fixme"><a name="fixme"><!-- --></a>
+        <h1 class="topictitle1">Doing stupid things with XSLT</h1>
+
+        
+        <div id="body"><a name="body"><!-- --></a><p>Author: Deborah Pickett &lt;debbiep-osdc@futzle.com&gt;</p>
+
+            <p>Extensible Stylesheet Language Transformations (XSLT) is a complete language, but
+                hardly a general-purpose one. Despite this, it has been shoehorned into doing some
+                spectacular things, some of them useless, and some of them not. This paper presents
+                Naxos, an XSLT 1.0 processor itself written in XSLT 1.0. </p>
+
+        </div>
+
+        <div class="nested1" id="x1"><a name="x1"><!-- --></a>
+            <h2 class="topictitle2">Origins of XSL</h2>
+
+            <div>
+            <p>The Extensible Stylesheet Language (XSL) came about once everyone realized that
+                Cascading Stylesheets (CSS)<a name="fnsrc_1" href="#fntarg_1"><sup>1</sup></a> were never going to
+                have the expressiveness required for traditional paged output. Pages introduce
+                fiddly logic with respect to widows and orphans, running headers and footers, and
+                floating figures. Sometimes it is necessary to repeat (in the case of chapter titles
+                in headers) or reorder (in the case of a figure that is out of the document flow)
+                text. CSS does not provide these kinds of operations.</p>
+
+            <p>A pioneering alternative to CSS, popular in the SGML world, is the Document Style
+                Semantics and Specification Language (DSSSL)<a name="fnsrc_2" href="#fntarg_2"><sup>2</sup></a>. This
+                Scheme-like language has features such as conditional processing to allow the
+                processor to make the run-time decisions necessary for paged output. Nowadays,
+                DSSSL, like SGML, is mostly a historical footnote.</p>
+
+            <p>With the rising popularity of XML, and lessons learned from CSS and DSSSL, came XSL.
+                Like CSS, XSL uses a simple box model to represent block and inline elements. Like
+                DSSSL, XSL has programming-like capabilities to defer formatting decisions to
+                runtime. Unlike both, XSL is itself written in XML, a recognition of the fact that
+                XML is also a general-purpose language for representing any tree-like structure.</p>
+
+            <p>Cleverly, XSL separates the formatting-specific directives (Formatting
+                    Objects<a name="fnsrc_3" href="#fntarg_3"><sup>3</sup></a>) from the general-purpose
+                tree-manipulation directives (Transformations<a name="fnsrc_4" href="#fntarg_4"><sup>4</sup></a>).
+                The latter turned out to be useful in the larger domain of converting XML documents
+                into other XML documents. Consequently, stylesheets written using XSL
+                Transformations, or XSLT, find use in situations unrelated to formatting print
+                output.</p>
+
+            <p>XSLT has the ability to perform both repetition (loops) and selection (if-else), and
+                is in fact a Turing-Complete language<a name="fnsrc_5" href="#fntarg_5"><sup>5</sup></a>. This means that it is capable of
+                expressing any construct possible in other programming languages, albeit not quite
+                so compactly.</p>
+
+        </div>
+
+        </div>
+        
+        <div class="nested1" id="x2"><a name="x2"><!-- --></a>
+            <h2 class="topictitle2">Why XSLT is different</h2>
+
+            <div>
+            <p> Compared with traditional programming languages, XSLT is somewhat alien. These
+                differences stem from deliberate decisions intended to allow processors to run as
+                efficiently as possible, predominantly through restricting the side-effects that
+                XSLT templates are able to have. For instance, XSLT does not have variables in the
+                usual sense. Variables must be given a value when they are declared, and there is no
+                way to change that value later. </p>
+
+            <p> XSLT also doesn't have loops in the normal sense of the word. Without mutable
+                variables, iteration has to be done in terms of recursion. This is familiar to
+                programmers of stack-based languages like Forth or functional languages like
+                Haskell. (There is a <strong>for-each</strong> element in XSLT, but this is more of a
+                parallel-processing directive, since the iterations cannot communicate with each
+                other.) </p>
+
+            <p> These seeming shortcomings are a deliberate design decision in XSLT. Without
+                side-effects, it becomes possible for processors to cache results from earlier calls
+                to templates with the same parameters. Additionally, processing can be more easily
+                parallelized and performed out of order when needed. It could almost be considered
+                wasteful for an XSLT processor to not be multi-threaded.</p>
+
+        </div>
+
+        </div>
+        
+        <div class="nested1" id="x3"><a name="x3"><!-- --></a>
+            <h2 class="topictitle2">Recursive recursion</h2>
+
+            <div>
+            <p>Most real-world XSLT stylesheets are unambitious in the scope of XML documents that
+                they manipulate. They may operate only on XML documents with a simple content model,
+                and usually the stylesheet has a specific, single purpose.  This is unfortunate,
+                because XSLT is capable of being used for more general-purpose programming.</p>
+
+            <p>To that end, I present Naxos.
+               Naxos is an XSLT 1.0 processor, itself written in XSLT 1.0. It makes use of no
+                    EXSLT<a name="fnsrc_6" href="#fntarg_6"><sup>6</sup></a> functions (in particular, <strong>node-set()</strong>
+                is avoided) and so should run correctly on any XSLT processor.</p>
+
+            <p>Naxos is made possible by the fact that XSLT stylesheets are themselves written in
+                XML, and hence able to be processed by another stylesheet. This has been used to
+                good end for stylesheet preprocessors, which turn stylesheets containing extensions
+                into vanilla XSLT<a name="fnsrc_7" href="#fntarg_7"><sup>7</sup></a>. It has also been used
+                for more pointless endeavours<a name="fnsrc_8" href="#fntarg_8"><sup>8</sup></a>.</p>
+
+            <div class="p">Ideally, an interpreter for its own language should boil down to variations on
+                <pre>function_plus(a, b)
+{
+  return eval(a) + eval(b);
+}</pre>
+
+                but this is made difficult in the case of XSLT by some holes in XSLT's introspection
+                capabilities. These came in four main flavours. </div>
+
+            <div class="section"><h3 class="sectiontitle">XPath</h3>
+                
+                <p> Although XSLT is pure XML, it makes use of an embedded sub-language called
+                        XPath<a name="fnsrc_9" href="#fntarg_9"><sup>9</sup></a>. XPath is a traditional token-based
+                    language used by XSLT to select nodes for templates, to match templates and to
+                    generate the result tree. An XPath expression such as
+                        <samp class="codeph">/html/body/*[@class='foo']</samp> must be tokenized and built into
+                    an expression tree before evaluation. XPath itself contains string operations,
+                    but they are not optimized for tokenization, so some low-level routines had to
+                    be written to provide these operations.</p>
+
+                <div class="p">Building the XPath expression tree was achieved by writing a recursive-descent
+                    parser in XSLT. This parser processes a grammar expressed in XML, invoking
+                    recursively productions which match as it walks along the expression string. An
+                    example of such a rule is the one for a PrimaryExpr, which is an atomic
+                    expression that produces a value:
+                    <pre>&lt;PrimaryExpr:rule&gt;
+    &lt;sequence name="Variable"&gt;
+        &lt;nonterminal name="VariableReference"/&gt;
+    &lt;/sequence&gt;
+    &lt;sequence name="ExprInParentheses"&gt;
+        &lt;literal value="("/&gt;
+        &lt;nonterminal name="Expr"/&gt;
+        &lt;literal value=")"/&gt;
+    &lt;/sequence&gt;
+    &lt;sequence name="Literal"&gt;
+        &lt;nonterminal name="Literal"/&gt;
+    &lt;/sequence&gt;
+    &lt;sequence name="Number"&gt;
+        &lt;nonterminal name="Number"/&gt;
+    &lt;/sequence&gt;
+    &lt;sequence name="FunctionCall"&gt;
+        &lt;nonterminal name="FunctionCall"/&gt;
+    &lt;/sequence&gt;
+&lt;/PrimaryExpr:rule&gt;</pre>
+
+                    The use of namespaces for the rule name enable it to be embedded into the same
+                    XSLT stylesheet as the template which interprets the expression tree, in true
+                    yacc style.</div>
+
+                <p>The XPath parser was affected in a more serious way by the following limitation
+                    of XSLT.</p>
+
+            </div>
+
+            <div class="section"><h3 class="sectiontitle">Result tree fragments are not node sets</h3>
+                
+                <div class="p">XPath defines three atomic data types: number, string, boolean. It also defines
+                    the node set, which is an unordered list of nodes from the document. While a
+                    node set remains within the boundaries of XPath, it remains a node set. However,
+                    XSLT 1.0 cannot create a node set; in particular, a template cannot return a
+                    node set. Instead, a template such as
+                    <pre>&lt;xsl:template name="make-foo-bar-text"&gt;
+    &lt;foo&gt;
+        &lt;bar/&gt;
+        text
+    &lt;/foo&gt;
+&lt;/xsl:template&gt;
+</pre>
+
+                    returns a result tree fragment. Result tree fragments can be used only as part
+                    of larger result tree fragments, or converted to strings. There is no way to
+                    have make-foo-bar-text return a node set.</div>
+
+                <div class="p">As a result, all of the XPath parsing routines pass serialized strings for the
+                    expression tree. The above example would instead be written as
+                    <pre>&lt;xsl:template name="make-foo-bar-text"&gt;
+    &lt;xsl:value-of select="foo:bar;text"&gt;
+&lt;/xsl:template&gt;
+</pre>
+
+                    Naturally, if any of the values themselves contain the delimiters <span class="q">":"</span> or
+                        <span class="q">";"</span> then they have to be encoded. Naxos has a rudimentary URL-style
+                    encoder/decoder for this purpose.</div>
+
+                <p>Similar serialization applies to expression result values. Since a value does not
+                    know what type it is, all values (number, string, boolean, node set, result tree
+                    fragment) are serialized into strings with a prefix tagging their type.
+                    Fortunately, there are few places where XSLT cares about the type of a
+                variable.</p>
+
+            </div>
+
+            <div class="section"><h3 class="sectiontitle">Passing context</h3>
+                
+                <div class="p">Although XSLT has very little context, this is not the same as no context. Any
+                    XPath expression and XSLT template has access to some out-of-band data,
+                    including: <ul>
+                        <li>The list of variables and their bound values.</li>
+
+                        <li>The context node, the node which is <span class="q">"this"</span> node.</li>
+
+                        <li>The context position, the position within the set of peer nodes that
+                            this node occupies.</li>
+
+                        <li>The set of namespace definitions in effect.</li>
+
+                    </ul>
+ This information has to be passed to each template in Naxos as it
+                    interprets the expression tree and executes templates. In the case where an
+                    element updates the context, this new context has to be propagated to all of the
+                    remaining templates. Naxos uses a rudimentary hash datatype, serialized into a
+                    string, to store the context. In the case of the document root and stylesheet
+                    root, both node-sets which cannot be serialized nondestructively, these are
+                    passed separately.</div>
+
+            </div>
+
+            <div class="section"><h3 class="sectiontitle">No computed gosub</h3>
+                
+                <div class="p">XSLT is not a functional language, so it is not possible to pass a function to a
+                    template. Doing this would have been helpful for the recursive-descent parser to
+                    chain processing of non-terminals. It isn't even possible to pass a template
+                    name in a template call:
+                    <pre>&lt;xsl:call-template name="{$template-name}"/&gt;</pre>
+</div>
+
+                <div class="p"> However, it <em>is</em> possible to dynamically call a template using
+                    apply-templates:
+                    <pre>&lt;xsl:apply-templates select="$template-nodeset"/&gt;</pre>
+
+                    The trick is to ensure that $template-nodeset contains exactly one node, so that
+                    the template which matches it is called exactly once. This is usually
+                    accomplished by creating a dummy element in a unique namespace:
+                    <pre>&lt;xsl:template match="*[namespace-uri()='http://futzle.com/2006/xslt-grammar/PrimaryExpr']"&gt;
+    &lt;!-- ... --&gt;
+&lt;/xsl:template&gt;
+</pre>
+
+                    The above template will match any element in the declared PrimaryExpr namespace,
+                    which Naxos has only one instance of.<a name="fnsrc_10" href="#fntarg_10"><sup>10</sup></a></div>
+
+                <p>This approach is also used by Naxos in the cases where a template has to
+                    deserialize a node set in order to apply an XPath function to it. Since a
+                    template cannot return a node set, Naxos passes a callback template to a generic
+                    node-set deserialization template, which calls the callback template with the
+                    node set.</p>
+
+            </div>
+
+        </div>
+
+        </div>
+        
+        <div class="nested1" id="x4"><a name="x4"><!-- --></a>
+            <h2 class="topictitle2">Invoking Naxos</h2>
+
+            <div>
+            <p>Naxos is invoked by executing the naxos.xsl stylesheet on the source document. Naxos
+                locates the stylesheet to interpret by examining the <strong>xml-stylesheet</strong>
+                processing instruction in the source document.</p>
+
+            <p>Naxos first scans the stylesheet, generating a list of known templates, their match
+                patterns and priorities. Any XPath expressions in template patterns are precompiled and kept in a hash
+                table. Naxos then applies the template which matches the root node of the source
+                document, which may invoke other templates in turn. The output is delivered to
+                standard output.</p>
+
+        </div>
+
+        </div>
+        
+        <div class="nested1" id="x5"><a name="x5"><!-- --></a>
+            <h2 class="topictitle2">Performance</h2>
+
+            <div>
+            <p>Naxos is optimized for correctness, not speed.  Several algorithms in it are polynomial time complexity.</p>
+
+            <div class="section"><h3 class="sectiontitle">XPath parser</h3>
+                
+                <p>Naxos' XPath parser is a recursive-descent parser. Recursive-descent parsers do
+                    not benefit much from a separate tokenization phase and support backtracking in
+                    the case of dead-end productions. For a near-stateless language like XSLT, a
+                    recursive-descent parser is a logical choice.</p>
+
+                <p>However, recursive-descent parsers are notoriously slow and require careful
+                    refactoring of the grammar to avoid infinite recursion. A lookahead parser would
+                    doubtless run more quickly but would not be so clean to write.</p>
+
+                <p>Naxos' recursive-descent parser is quite generic and could be adapted without
+                    much effort to parse any other grammar.</p>
+
+
+            </div>
+
+            <div class="section"><h3 class="sectiontitle">XPath interpreter</h3>
+                
+                <p>Naxos is comparatively faster at evaluating an expression tree. The XPath grammar
+                    is specified well enough that evaluation seldom needs to go through redundant
+                    stages, and backtracking is unnecessary. The largest overhead is likely of encoding and decoding the serialized
+                    XPath expressions produced by the parser.  The following table shows some evaluation times on a Core Duo 1.83 MHz processor.</p>
+
+                
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" frame="border" border="1" rules="all"><caption>Table 1. Naxos XPath parse and evaluation times</caption>
+                        
+                        
+                        
+                        <thead align="left">
+                            <tr>
+                                <th valign="top" width="NaN%" id="d0e289">XPath expression</th>
+
+                                <th valign="top" width="NaN%" id="d0e292">Parse time, seconds</th>
+
+                                <th valign="top" width="NaN%" id="d0e295">Evaluation time, seconds</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">/</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">0.3</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">0.3</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">1 + 2 * 3</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">0.6</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">0.6</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">string-length('123')</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">1.3</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">1.4</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">/*/foo/bar</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">0.6</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">0.7</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">/*[@class = 'foo']</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">2.5</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">3.3</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">/*[contains(@class,'foo')]</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">11.0</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">13.5</td>
+
+                            </tr>
+
+                            <tr>
+                                <td valign="top" width="NaN%" headers="d0e289 ">/descendant-or-self::*[1]</td>
+
+                                <td valign="top" width="NaN%" headers="d0e292 ">1.1</td>
+
+                                <td valign="top" width="NaN%" headers="d0e295 ">1.6</td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+</div>
+
+            </div>
+
+            <div class="section"><h3 class="sectiontitle">XSLT engine</h3>
+                
+                <p>Each stylesheet template declaration incurs a compilation overhead as its XPath patterns are parsed and serialized.
+                    Similarly, global variables are parsed and evaluated, once, before templates are applied to the root node.  These template patterns
+                    and variable values are retained as part of the global context for subsequent template application.
+                </p>
+
+                <p>Choosing the template to apply to a node requires testing each templates in the stylesheet on the source document node and
+                on all its ancestors.  The serialization and deserialization of result tree fragments depends on the depth of the result tree.
+                    Together, this results in polynomial-time evaluation for any XML source document.</p>
+
+            </div>
+
+        </div>
+
+        </div>
+        
+        <div class="nested1" id="x6"><a name="x6"><!-- --></a>
+            <h2 class="topictitle2">Future work</h2>
+
+            <div>
+            <div class="p">XSLT 1.0 as a standard is now seven years old, and XSLT 2.0 is (as of 2006) close to becoming an official W3C recommendation.  There
+                are already XSLT 2.0 processors available<a name="fnsrc_11" href="#fntarg_11"><sup>11</sup></a>.  XSLT 2.0 (and XPath 2.0) contain
+                a more complete introspection model, solving almost every problem in XSLT 1.0 that Naxos had to create workarounds for:
+            <ul>
+                <li>Tokenization functions in XPath 2.0 allow regular expression matching on strings, simplifying parsing.</li>
+
+                <li>Node sets and result tree fragments both become sequences in XSLT 2.0 and are interchangeable.</li>
+
+                <li>Tunnel parameters obviate the need to name parameters which pass through a template unchanged.</li>
+
+                <li>Templates can be called from within XPath 2.0 expressions.</li>
+
+            </ul>
+
+            Of course, XSLT 2.0 introduces many more functions and elements, so an XSLT 2.0 version of Naxos would likely be almost as big.
+            </div>
+
+            <p>Naxos began as a self dare, and quickly became a monster.  The XSLT parser and interpreter alone are 7500 lines of code.
+            But it has helped to give me an appreciation for XSLT that mere daily use would not have done.</p>
+
+        </div>
+
+        </div>
+        
+        
+    </div>
+
+<div class="p"><a name="fntarg_1" href="#fnsrc_1"><sup>1</sup></a>  http://www.w3.org/Style/CSS/</div><div class="p"><a name="fntarg_2" href="#fnsrc_2"><sup>2</sup></a>  http://jclark.com/dsssl/</div><div class="p"><a name="fntarg_3" href="#fnsrc_3"><sup>3</sup></a>  http://www.w3.org/TR/xsl/</div><div class="p"><a name="fntarg_4" href="#fnsrc_4"><sup>4</sup></a>  http://www.w3.org/TR/xslt</div><div class="p"><a name="fntarg_5" href="#fnsrc_5"><sup>5</sup></a>  Bob Lyons has demonstrated this by creating
+                    a Universal Turing Machine interpreter,
+                http://www.unidex.com/turing/utm.htm</div><div class="p"><a name="fntarg_6" href="#fnsrc_6"><sup>6</sup></a>  http://www.exslt.org/</div><div class="p"><a name="fntarg_7" href="#fnsrc_7"><sup>7</sup></a>  Oliver Becker has several at
+                    http://www2.informatik.hu-berlin.de/~obecker/XSLT/.</div><div class="p"><a name="fntarg_8" href="#fnsrc_8"><sup>8</sup></a>  See the quine stylesheet, ibid.</div><div class="p"><a name="fntarg_9" href="#fnsrc_9"><sup>9</sup></a>  http://www.w3.org/TR/xpath</div><div class="p"><a name="fntarg_10" href="#fnsrc_10"><sup>10</sup></a>  This technique has been taken to
+                        extremes at http://fxsl.sourceforge.net/.</div><div class="p"><a name="fntarg_11" href="#fnsrc_11"><sup>11</sup></a>  Saxon 8 is at http://saxon.sourceforge.net/</div>
+</body>
+</html>
